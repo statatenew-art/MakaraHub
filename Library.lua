@@ -1,4 +1,4 @@
--- MakaraHub Bağımsız TDS Çekirdeği (Aether Bypass Edition)
+-- MakaraHub Bağımsız TDS Çekirdeği (New Play Button & Matchmaking)
 local TDS = {}
 TDS.PlacedTowers = {}
 TDS.TargetMap = ""
@@ -17,46 +17,33 @@ local RemoteFunction = ReplicatedStorage:WaitForChild("RemoteFunction", 15)
 local RemoteEvent = ReplicatedStorage:WaitForChild("RemoteEvent", 15)
 
 ---------------------------------------------------------
--- 1. LOBİDEN ANINDA MAÇA ATMA (AETHER MATCHMAKING)
+-- 1. YENİ "PLAY" BUTONU İLE ANINDA MAÇ BAŞLATMA
 ---------------------------------------------------------
-local function fastEnterGame(targetMap, targetMode)
-    print("[MakaraHub] Harita aranıyor ve maça başlatılıyor: " .. tostring(targetMap))
-    
-    -- 1. Doğrudan Matchmaking Remote'u ile başlatmayı dene
+local function fastPlayMatch(targetMap, targetMode)
+    print("[MakaraHub] Play menüsü üzerinden maç başlatılıyor: " .. tostring(targetMap))
+
+    -- 1. Yöntem: Yeni Play butonu Matchmaking remote çağrıları
     pcall(function()
-        RemoteFunction:InvokeServer("Matchmaking", "Join", {
+        RemoteFunction:InvokeServer("Matchmaking", "Create", {
+            ["Map"] = targetMap,
+            ["Difficulty"] = targetMode or "Easy"
+        })
+    end)
+    
+    pcall(function()
+        RemoteFunction:InvokeServer("Matchmaking", "StartMatch")
+    end)
+
+    -- 2. Yöntem: Standart Hızlı Oyun / Solo Asansör Remote'u
+    pcall(function()
+        RemoteFunction:InvokeServer("Elevators", "JoinCustom", {
             ["Map"] = targetMap,
             ["Difficulty"] = targetMode or "Easy",
             ["Solo"] = true
         })
     end)
 
-    -- 2. Eğer asansör modeli üzerinden çalışıyorsa:
-    local elevators = Workspace:FindFirstChild("Elevators")
-    if elevators then
-        for _, el in ipairs(elevators:GetChildren()) do
-            local mapVal = el:FindFirstChild("Map") or (el:FindFirstChild("State") and el.State:FindFirstChild("Map"))
-            local plrsVal = el:FindFirstChild("Players") or (el:FindFirstChild("State") and el.State:FindFirstChild("Players"))
-
-            if mapVal and plrsVal and string.lower(mapVal.Value) == string.lower(targetMap) and plrsVal.Value < 4 then
-                local zone = el:FindFirstChild("Zone") or el:FindFirstChildWhichIsA("BasePart")
-                local char = LocalPlayer.Character
-                if zone and char and char:FindFirstChild("HumanoidRootPart") then
-                    char.HumanoidRootPart.CFrame = zone.CFrame + Vector3.new(0, 3, 0)
-                    task.wait(0.2)
-                    
-                    -- Asansör süresini beklemeden maçı zorla başlat
-                    pcall(function()
-                        RemoteFunction:InvokeServer("Elevators", "Start")
-                        RemoteFunction:InvokeServer("Elevators", "Ready")
-                    end)
-                    break
-                end
-            end
-        end
-    end
-
-    -- Maça ışınlanana kadar alt satırlara (kule koymaya) ASLA geçme
+    -- Maça ışınlanana kadar alt satırlara (kule dizilimine) geçilmesini engelle
     while isLobby do
         task.wait(0.5)
     end
@@ -89,12 +76,12 @@ function TDS:WaitForWave(targetWave)
 end
 
 ---------------------------------------------------------
--- 3. AETHER MAKRO METODLARI
+-- 3. MAKRO KOMUTLARI
 ---------------------------------------------------------
 function TDS:GameInfo(mapName, modifiers)
     TDS.TargetMap = mapName
     if isLobby then
-        fastEnterGame(mapName, TDS.CurrentMode)
+        fastPlayMatch(mapName, TDS.CurrentMode)
     end
 end
 
@@ -200,69 +187,6 @@ function TDS:Sell(index)
     end
     task.wait(0.2)
 end
-
-function TDS:SetTarget(index, mode)
-    if isLobby then return end
-    local tower = TDS.PlacedTowers[index]
-    if tower then
-        pcall(function()
-            RemoteFunction:InvokeServer("Troops", "Target", "Set", {
-                ["Troop"] = tower,
-                ["Target"] = mode
-            })
-        end)
-    end
-    task.wait(0.2)
-end
-
-function TDS:Ability(index, abilityName, dataTable, loop)
-    if isLobby then return end
-    local tower = TDS.PlacedTowers[index]
-    if tower then
-        local payload = {
-            ["Troop"] = tower,
-            ["Name"] = abilityName,
-            ["Data"] = dataTable or {}
-        }
-        if loop then
-            task.spawn(function()
-                while tower and tower.Parent do
-                    pcall(function()
-                        RemoteFunction:InvokeServer("Troops", "Abilities", "Activate", payload)
-                    end)
-                    task.wait(1)
-                end
-            end)
-        else
-            pcall(function()
-                RemoteFunction:InvokeServer("Troops", "Abilities", "Activate", payload)
-            end)
-        end
-    end
-end
-
----------------------------------------------------------
--- 4. OTO-DÖNGÜLER (AUTO SKIP & AUTO CHAIN)
----------------------------------------------------------
-task.spawn(function()
-    while true do
-        task.wait(1)
-        if not isLobby then
-            -- Otomatik Dalga Atlama (Auto Skip)
-            if getgenv().AutoSkip then
-                pcall(function()
-                    RemoteFunction:InvokeServer("Voting", "Skip")
-                end)
-            end
-            -- Otomatik Hazır Verme (Auto Ready)
-            if getgenv().AutoReady then
-                pcall(function()
-                    RemoteFunction:InvokeServer("Team", "Ready")
-                end)
-            end
-        end
-    end
-end)
 
 shared.TDSTable = TDS
 return TDS
