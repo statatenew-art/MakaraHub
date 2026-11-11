@@ -1,4 +1,4 @@
--- MakaraHub Çekirdek Kütüphanesi (v2.0 - Network & Override Entegreli)
+-- MakaraHub TDS Core Library (v2.1 - Table Safe & Auto Lobby/Island)
 local TDS = {}
 TDS.PlacedTowers = {}
 
@@ -11,7 +11,7 @@ local RemoteFunction = ReplicatedStorage:WaitForChild("RemoteFunction", 15)
 local RemoteEvent = ReplicatedStorage:WaitForChild("RemoteEvent", 15)
 local Network = ReplicatedStorage:FindFirstChild("Network")
 
--- Haritaların Zorluk Eşleştirmesi
+-- Haritaların Varsayılan Zorluk Eşleştirmesi
 local MapDifficulties = {
     ["Gilded Path"] = "Easy",
     ["Grass Isle"] = "Easy",
@@ -40,11 +40,22 @@ local function getCurrentWave()
     return 0
 end
 
-function TDS:GameInfo(mapName, customDifficulty)
-    local difficulty = customDifficulty or MapDifficulties[mapName] or "Easy"
-    print(string.format("[MakaraHub] Başlatılıyor -> Harita: %s | Zorluk: %s", tostring(mapName), difficulty))
+function TDS:GameInfo(mapData, customDifficulty)
+    local mapName = "Gilded Path"
+    local difficulty = "Easy"
 
-    -- 1. Lobideysek: Doğrudan Eşleşmeye Gir
+    -- Gelen veriyi güvenli çözümle (Tablo veya String)
+    if type(mapData) == "table" then
+        mapName = mapData["Map"] or mapData["map"] or mapData[1] or "Gilded Path"
+        difficulty = mapData["Difficulty"] or mapData["difficulty"] or mapData["Mode"] or customDifficulty or MapDifficulties[mapName] or "Easy"
+    elseif type(mapData) == "string" then
+        mapName = mapData
+        difficulty = customDifficulty or MapDifficulties[mapName] or "Easy"
+    end
+
+    print(string.format("[MakaraHub] Baslatiliyor -> Harita: %s | Zorluk: %s", tostring(mapName), tostring(difficulty)))
+
+    -- 1. Lobideysek: Doğrudan Tekli Odaya Gir
     if not isInGame() then
         task.spawn(function()
             pcall(function()
@@ -73,7 +84,7 @@ function TDS:GameInfo(mapName, customDifficulty)
             end)
 
             if success then
-                print("[MakaraHub] Harita Override Yapıldı: " .. tostring(mapName))
+                print("[MakaraHub] Harita Override Yapildi: " .. tostring(mapName))
                 task.wait(0.4)
                 pcall(function()
                     RemoteEvent:FireServer("LobbyVoting", "Ready")
@@ -85,11 +96,11 @@ function TDS:GameInfo(mapName, customDifficulty)
     end)
 
     -- 3. Oyun Haritasının Açılmasını Bekle
-    print("[MakaraHub] Oyun haritasına geçiş bekleniyor...")
+    print("[MakaraHub] Oyun haritasina gecis bekleniyor...")
     while not isInGame() do
         task.wait(1)
     end
-    print("[MakaraHub] Harita yüklendi! Kule adımlarına geçiliyor.")
+    print("[MakaraHub] Harita yuklendi! Kule adimlarina geciliyor.")
 end
 
 function TDS:Loadout(...)
