@@ -1,4 +1,4 @@
--- MakaraHub Bağımsız TDS Motoru (Library.lua)
+-- MakaraHub Güçlendirilmiş TDS Çekirdeği (Library.lua)
 local TDS = {}
 TDS.PlacedTowers = {}
 TDS.TargetMap = ""
@@ -15,6 +15,32 @@ local isLobby = (game.PlaceId == LOBBY_PLACE_ID)
 
 local RemoteFunction = ReplicatedStorage:WaitForChild("RemoteFunction", 15)
 local RemoteEvent = ReplicatedStorage:WaitForChild("RemoteEvent", 15)
+
+---------------------------------------------------------
+-- YARDIMCI METODLAR (DALGA VE PARA KONTROLÜ)
+---------------------------------------------------------
+local function getCash()
+    local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
+    if leaderstats and leaderstats:FindFirstChild("Cash") then
+        return leaderstats.Cash.Value
+    end
+    return 0
+end
+
+local function getCurrentWave()
+    local state = ReplicatedStorage:FindFirstChild("State")
+    if state and state:FindFirstChild("Wave") then
+        return state.Wave.Value
+    end
+    return 0
+end
+
+function TDS:WaitForWave(targetWave)
+    if isLobby then return end
+    while getCurrentWave() < targetWave do
+        task.wait(0.5)
+    end
+end
 
 ---------------------------------------------------------
 -- LOBİ ASANSÖR YÖNETİMİ
@@ -44,7 +70,7 @@ local function joinElevator(targetMap)
 end
 
 ---------------------------------------------------------
--- TEMEL MAKRO API METODLARI
+-- OYUN VE MAKRO FONKSİYONLARI
 ---------------------------------------------------------
 function TDS:GameInfo(mapName, modifiers)
     TDS.TargetMap = mapName
@@ -92,24 +118,33 @@ function TDS:Place(towerName, x, y, z, ...)
     local rot = CFrame.Angles(0, 0, 0)
 
     local placedInstance = nil
-    pcall(function()
-        placedInstance = RemoteFunction:InvokeServer("Troops", "Place", towerName, {
-            ["Position"] = pos,
-            ["Rotation"] = rot
-        })
-    end)
+    local retries = 0
 
-    if not placedInstance then
-        local towers = Workspace:FindFirstChild("Towers") or Workspace:FindFirstChild("Troops")
-        if towers then
-            local myT = {}
-            for _, tr in ipairs(towers:GetChildren()) do
-                local rep = tr:FindFirstChild("TowerReplicator")
-                if (rep and rep:GetAttribute("OwnerId") == LocalPlayer.UserId) or (tr:FindFirstChild("Owner") and tr.Owner.Value == LocalPlayer.UserId) then
-                    table.insert(myT, tr)
+    while not placedInstance and retries < 15 do
+        pcall(function()
+            placedInstance = RemoteFunction:InvokeServer("Troops", "Place", towerName, {
+                ["Position"] = pos,
+                ["Rotation"] = rot
+            })
+        end)
+
+        if not placedInstance then
+            local towers = Workspace:FindFirstChild("Towers") or Workspace:FindFirstChild("Troops")
+            if towers then
+                for _, tr in ipairs(towers:GetChildren()) do
+                    local rep = tr:FindFirstChild("TowerReplicator")
+                    local isMine = (rep and rep:GetAttribute("OwnerId") == LocalPlayer.UserId) or (tr:FindFirstChild("Owner") and tr.Owner.Value == LocalPlayer.UserId)
+                    if isMine and (tr:GetPivot().Position - pos).Magnitude < 1 then
+                        placedInstance = tr
+                        break
+                    end
                 end
             end
-            placedInstance = myT[#myT]
+        end
+
+        if not placedInstance then
+            retries = retries + 1
+            task.wait(0.5)
         end
     end
 
@@ -130,7 +165,7 @@ function TDS:Upgrade(index, path)
             })
         end)
     end
-    task.wait(0.2)
+    task.wait(0.25)
 end
 
 function TDS:Sell(index)
@@ -185,6 +220,21 @@ function TDS:Ability(index, abilityName, dataTable, loop)
         end
     end
 end
+
+-- Oyun Sonu Lobiye Dönme Döngüsü
+task.spawn(function()
+    while true do
+        task.wait(2)
+        if not isLobby then
+            local state = ReplicatedStorage:FindFirstChild("State")
+            if state and state:FindFirstChild("GameOver") and state.GameOver.Value == true then
+                task.wait(3)
+                TeleportService:Teleport(LOBBY_PLACE_ID, LocalPlayer)
+                break
+            end
+        end
+    end
+end)
 
 shared.TDSTable = TDS
 return TDS
