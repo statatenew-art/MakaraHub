@@ -1,4 +1,4 @@
--- MakaraHub Güçlendirilmiş TDS Çekirdeği (Library.lua)
+-- MakaraHub Tam Otomatik TDS Motoru (Library.lua)
 local TDS = {}
 TDS.PlacedTowers = {}
 TDS.TargetMap = ""
@@ -17,17 +17,19 @@ local RemoteFunction = ReplicatedStorage:WaitForChild("RemoteFunction", 15)
 local RemoteEvent = ReplicatedStorage:WaitForChild("RemoteEvent", 15)
 
 ---------------------------------------------------------
--- YARDIMCI METODLAR (DALGA VE PARA KONTROLÜ)
+-- 1. DALGA VE OYUN VERİSİ TAKİPÇİSİ
 ---------------------------------------------------------
-local function getCash()
-    local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
-    if leaderstats and leaderstats:FindFirstChild("Cash") then
-        return leaderstats.Cash.Value
-    end
-    return 0
-end
-
 local function getCurrentWave()
+    -- TDS StateReplicators üzerinden doğru dalga okuma
+    local stateReplicators = ReplicatedStorage:FindFirstChild("StateReplicators")
+    if stateReplicators then
+        local gameState = stateReplicators:FindFirstChild("GameStateReplicator")
+        if gameState then
+            local wave = gameState:GetAttribute("Wave")
+            if wave then return wave end
+        end
+    end
+    -- Yedek okuma
     local state = ReplicatedStorage:FindFirstChild("State")
     if state and state:FindFirstChild("Wave") then
         return state.Wave.Value
@@ -43,9 +45,10 @@ function TDS:WaitForWave(targetWave)
 end
 
 ---------------------------------------------------------
--- LOBİ ASANSÖR YÖNETİMİ
+-- 2. LOBİDEN ASANSÖRE BİNME VE IŞINLANMA KİLİDİ
 ---------------------------------------------------------
-local function joinElevator(targetMap)
+local function joinElevatorAndBlock(targetMap)
+    print("[MakaraHub] Asansör aranıyor: " .. tostring(targetMap))
     local elevators = Workspace:WaitForChild("Elevators", 15)
     if not elevators then return end
 
@@ -61,21 +64,28 @@ local function joinElevator(targetMap)
                 if zone and char and char:FindFirstChild("HumanoidRootPart") then
                     char.HumanoidRootPart.CFrame = zone.CFrame + Vector3.new(0, 3, 0)
                     joined = true
+                    print("[MakaraHub] Asansöre binildi! Maçın başlaması bekleniyor...")
                     break
                 end
             end
         end
         if not joined then task.wait(1.5) end
     end
+
+    -- KRİTİK ADIM: Maç sunucusuna ışınlanana kadar kodun alt satırlara geçmesini ENGELLE
+    while isLobby do
+        task.wait(1)
+    end
 end
 
 ---------------------------------------------------------
--- OYUN VE MAKRO FONKSİYONLARI
+-- 3. MAKRO KOMUTLARI
 ---------------------------------------------------------
 function TDS:GameInfo(mapName, modifiers)
     TDS.TargetMap = mapName
     if isLobby then
-        task.spawn(function() joinElevator(mapName) end)
+        -- Lobideysen asansöre bin ve maça geçene kadar burada bekle!
+        joinElevatorAndBlock(mapName)
     end
 end
 
@@ -120,7 +130,7 @@ function TDS:Place(towerName, x, y, z, ...)
     local placedInstance = nil
     local retries = 0
 
-    while not placedInstance and retries < 15 do
+    while not placedInstance and retries < 20 do
         pcall(function()
             placedInstance = RemoteFunction:InvokeServer("Troops", "Place", towerName, {
                 ["Position"] = pos,
@@ -180,61 +190,6 @@ function TDS:Sell(index)
     end
     task.wait(0.2)
 end
-
-function TDS:SetTarget(index, mode)
-    if isLobby then return end
-    local tower = TDS.PlacedTowers[index]
-    if tower then
-        pcall(function()
-            RemoteFunction:InvokeServer("Troops", "Target", "Set", {
-                ["Troop"] = tower,
-                ["Target"] = mode
-            })
-        end)
-    end
-    task.wait(0.2)
-end
-
-function TDS:Ability(index, abilityName, dataTable, loop)
-    if isLobby then return end
-    local tower = TDS.PlacedTowers[index]
-    if tower then
-        local payload = {
-            ["Troop"] = tower,
-            ["Name"] = abilityName,
-            ["Data"] = dataTable or {}
-        }
-        if loop then
-            task.spawn(function()
-                while tower and tower.Parent and getgenv().AutoStrat do
-                    pcall(function()
-                        RemoteFunction:InvokeServer("Troops", "Abilities", "Activate", payload)
-                    end)
-                    task.wait(1)
-                end
-            end)
-        else
-            pcall(function()
-                RemoteFunction:InvokeServer("Troops", "Abilities", "Activate", payload)
-            end)
-        end
-    end
-end
-
--- Oyun Sonu Lobiye Dönme Döngüsü
-task.spawn(function()
-    while true do
-        task.wait(2)
-        if not isLobby then
-            local state = ReplicatedStorage:FindFirstChild("State")
-            if state and state:FindFirstChild("GameOver") and state.GameOver.Value == true then
-                task.wait(3)
-                TeleportService:Teleport(LOBBY_PLACE_ID, LocalPlayer)
-                break
-            end
-        end
-    end
-end)
 
 shared.TDSTable = TDS
 return TDS
