@@ -1,0 +1,216 @@
+================================================================================
+                    TDS AUTOMATION API: TECHNICAL DOCUMENTATION
+================================================================================
+
+[ CORE ENGINE METHODS ]
+--------------------------------------------------------------------------------
+TDS:Place(name, x, y, z, ...)       -> Places tower, returns index (1-based).
+TDS:Upgrade(idx, path)              -> Upgrades tower at index (path 1 or 2, default: 1).
+TDS:Sell(idx, req_wave)             -> Sells tower at index (optional wave delay).
+TDS:SellAll(req_wave)               -> Sells all placed towers (optional wave delay).
+TDS:SetTarget(idx, mode, req_wave)  -> Targeting: "First", "Strong", "Last", "Weak", "Random".
+TDS:Loadout(...)                    -> Equips towers by name (e.g. TDS:Loadout("Scout", "Farm")).
+TDS:Mode(difficulty, code)          -> Joins mode / map matchmaking or enters private server.
+TDS:GameInfo(map, modifiers)        -> Selects the desired Map and Modifiers.
+TDS:StartGame()                     -> Ready up in the lobby matchmaking elevator.
+TDS:Ready()                         -> Votes ready on the match start prompt.
+TDS:GetWave()                       -> Returns current wave number (integer).
+TDS:WaitForWave(target_wave)        -> Pauses execution until target wave is reached.
+TDS:VoteSkip(start_wave, end_wave)  -> Votes to skip waves. Ex: TDS:VoteSkip(1) or TDS:VoteSkip(1, 40).
+TDS:UnlockTimeScale()               -> Unlocks 2x time scale using Speed Tickets.
+TDS:TimeScale(val)                  -> Cycles time scale to: 0, 0.5, 1, 1.5, or 2.
+TDS:RestartGame()                   -> Votes to replay/restart match at the game-over screen.
+TDS:AutoChain(...)                  -> Automatic Commander chain with timescale awareness.
+TDS:MedicSelect(medic_idx, tgt_idx) -> Directs Medic at medic_idx to cleanse/heal tgt_idx.
+TDS:MedicChain(...)                 -> Automatic Medic chain micro using external chaining module.
+TDS:ResetAllStates()                -> Clears placed towers, upgrade history, and logs.
+TDS:RunStrategy()                   -> Replays recorded actions from 'ADS_LastStrat.lua'.
+TDS:Addons(skip_lobby_check)        -> Loads external premium features / progression modules.
+
+--------------------------------------------------------------------------------
+[ MODIFIERS & GAME INFO ]
+--------------------------------------------------------------------------------
+Usage: TDS:GameInfo("Simplicity", {HiddenEnemies = true, ExplodingEnemies = true})
+
+Valid Modifiers List:
+• HiddenEnemies     • Glass             • ExplodingEnemies  • Limitation
+• Committed         • HealthyEnemies    • Fog               • FlyingEnemies
+• Broke             • SpeedyEnemies     • Quarantine        • JailedTowers
+• Inflation
+
+Note: Pass table as key-value ({JailedTowers = true}) or array ({"JailedTowers"}).
+
+--------------------------------------------------------------------------------
+[ TDS:Mode (MATCHMAKING MODES) ]
+--------------------------------------------------------------------------------
+Usage: TDS:Mode("Fallen") or TDS:Mode("Molten", "PRIVATE_SERVER_CODE")
+
+Available Modes & Maps:
+• Standard Survival : "Easy", "Molten", "Intermediate", "Fallen"
+• Hardcore / Void   : "Hardcore" (Easy), "Voidcore" (Hard)
+• Special Gamemodes : "PizzaParty", "Badlands", "PollutedWasteland"
+• Event Difficulties: "DuckyEasy", "DuckyHard"
+• Trials Mode       : "Trial"
+
+--------------------------------------------------------------------------------
+[ TDS:SetOption ]
+--------------------------------------------------------------------------------
+Description: Used for towers with configurable unit spawns, tracks, or traps.
+Usage: TDS:SetOption(index, "OptionName", "Value", requiredWave)
+
+1. Mercenary Base:
+   - "Unit 1", "Unit 2", "Unit 3" --> "Grenadier", "Rifleman", "Riot Guard", "Field Medic"
+
+2. Trapper:
+   - "Trap" --> "Spike", "Landmine", or "Bear Trap"
+
+3. DJ Booth:
+   - "Track" --> "Green", "Red", or "Purple"
+
+--------------------------------------------------------------------------------
+[ TDS:Ability ]
+--------------------------------------------------------------------------------
+Description: Triggers tower special abilities. Set 'loop' to true for auto-spam.
+Usage: TDS:Ability(index, "AbilityName", dataTable, loop)
+Shortcut: TDS:Ability(index, "AbilityName", true) -- Automatically loops
+
+• Commander:
+  - "Call Of Arms" (No data required)
+  - "Support Caravan" (No data required)
+  - Pro-tip: Use TDS:AutoChain(idx1, idx2, idx3) instead for automatic cycling!
+
+• DJ Booth:
+  - "Drop The Beat" (No data required)
+
+• Medic:
+  - "Ubercharge" (No data required)
+  - Pro-tip: Use TDS:MedicSelect(medicIdx, targetIdx) to direct healing.
+
+• Necromancer:
+  - "Raise The Dead" (No data required)
+
+• Hacker:
+  - "Hologram Tower"
+    Data: { 
+        towerToClone = cloneIdx, 
+        towerPosition = Vector3.new(x, y, z) -- or { Vector3.new(...), Vector3.new(...) } for random
+    }
+
+• Pursuit:
+  - "Patrol" 
+    Data: { ["position"] = Vector3.new(x, y, z) }
+
+• Gatling Gun:
+  - "FPS"
+    Data: { ["enabled"] = true / false }
+
+• Brawler:
+  - "Reposition"
+    Data: { ["position"] = Vector3.new(x, y, z) }
+
+• Mercenary Base:
+  - "Air-Drop"
+    Data: { 
+        ["pathName"] = 1, 
+        ["dist"] = 0 to 200, -- (Simplicity Max: 156)
+        ["directionCFrame"] = CFrame.new() 
+    }
+
+• Military Base:
+  - "Airstrike"
+    Data: { 
+        ["pathName"] = 1, 
+        ["dist"] = 0 to 200, 
+        ["pointToEnd"] = CFrame.new() 
+    }
+
+--------------------------------------------------------------------------------
+[ GLOBAL CONFIGURATION (getgenv) ]
+--------------------------------------------------------------------------------
+-- Automation & Loops
+getgenv().AutoStrat              = true   -- Flag for external autoexec loaders
+getgenv().AutoRejoin             = true   -- Reconnects & resumes strat on game finish
+getgenv().AutoRestart            = true   -- Votes to restart match immediately
+getgenv().AutoSkip               = true   -- Automatically votes to skip waves
+getgenv().AutoReady              = true   -- Automatically votes ready in match
+getgenv().AutoPickups            = true   -- Auto-collects event items / snowballs
+
+-- Abilities & Towers
+getgenv().AutoChain              = false  -- Automatic Commander chain automation
+getgenv().AutoMedic              = false  -- Automatic Medic chain automation
+getgenv().AutoDJ                 = false  -- Automatic DJ Drop The Beat
+getgenv().AutoGatling            = false  -- Automatic Gatling Gun activation
+getgenv().AutoNecro              = false  -- Automatic Necromancer activation
+getgenv().AutoMilitary           = false  -- Automatic Military Base airstrike
+getgenv().AutoMercenary          = false  -- Automatic Mercenary Base airdrop
+getgenv().SellFarms              = false  -- Auto sell farms at specified wave
+getgenv().SellFarmsWave          = 35     -- Target wave to sell farms
+
+-- Timescale / Speed Tickets
+getgenv().TimeScaleEnabled       = true   -- Automatically uses speed tickets
+getgenv().TimeScaleValue         = 2      -- Multiplier: 0.5, 1, 1.5, or 2
+
+-- Webhook Logging
+getgenv().WebhookURL             = ""     -- Discord Webhook URL (Must be full URL)
+getgenv().SendWebhook            = true   -- Sends match result logs to Webhook
+
+-- Performance & Utilities
+getgenv().AntiLag                = true   -- Lowers graphics quality to prevent lag
+getgenv().Disable3DRendering     = false  -- Turns off 3D viewport for extreme FPS
+getgenv().Snapper                = true   -- Helps position towers tightly together
+
+--------------------------------------------------------------------------------
+[ ADVANCED: AUTO-CHAINING (COMMANDER) ]
+--------------------------------------------------------------------------------
+To setup a Commander chain without manual timers:
+    local cancel = TDS:AutoChain(1, 2, 3)
+
+The script automatically detects timescale:
+• At 1x speed: Waits 10.5 seconds between activations.
+• At 2x speed: Waits 5.5 seconds between activations.
+Call `cancel()` to terminate the chain at any wave.
+
+--------------------------------------------------------------------------------
+[ ADVANCED: INFINITE LOOP (Autoexec) ]
+--------------------------------------------------------------------------------
+For 24/7 AFK, place your strategy script into your executor's 'autoexec' folder.
+Whenever a match completes:
+1. If `AutoRestart = true`: The script votes restart directly on the rewards screen.
+2. If `AutoRejoin = true`: The script teleports back to the lobby, replays matchmaking,
+   and automatically resumes execution from 'ADS_LastStrat.lua'.
+
+--------------------------------------------------------------------------------
+[ ADVANCED: POSITIONING (dist / pointToEnd) ]
+--------------------------------------------------------------------------------
+The "dist" parameter controls WHERE on the path the ability triggers.
+
+• 0 = The START of the road (where enemies spawn).
+• The higher the number, the further down the road the ability targets.
+• Each map has a different maximum distance (Simplicity is ~156).
+
+HOW TO FIND VALUES FOR OTHER MAPS:
+1. Open a RemoteSpy (e.g. SimpleSpy or Hydroxide).
+2. Activate the Ability manually in-game.
+3. Look for the 'RemoteFunction' call named "Troops" with action "Abilities".
+4. Check the 'Data' table in the spy log to see the exact 'dist' value.
+
+NOTE: If you set the value to 999, the unit/airstrike will target the 
+very end of the path or remain stuck at the exit until it times out.
+
+--------------------------------------------------------------------------------
+[ TROUBLESHOOTING & TIPS ]
+--------------------------------------------------------------------------------
+• ERROR "No HTTP Function": Your executor does not support 'request'. Use a
+  supported executor with standard sUNC compatibility.
+• TOWERS NOT PLACING: Ensure you have enough cash. The engine will retry 
+  automatically, but cannot place towers if your balance is insufficient.
+• INDEXING: Towers are indexed in the order they are placed (1, 2, 3...). If 
+  you sell Index 1, Index 2 remains 2; it does not shift down.
+• LOADOUT EQUIPPING: Always use `TDS:Loadout("Tower1", "Tower2", ...)` rather 
+  than individual equip calls. It handles unequipping and re-equipping cleanly.
+• WEBHOOKS: Ensure `getgenv().WebhookURL` is your full Discord webhook URL. If 
+  left empty or invalid, the script will skip sending results.
+
+================================================================================
+                    COPYRIGHT 2025 DUXII - PERSONAL USE ONLY
+================================================================================
