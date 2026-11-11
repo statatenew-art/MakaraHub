@@ -268,7 +268,6 @@ local currentWindowTheme = {
 }
 
 do
-
 	function addToTheme(name, obj)
 		if not SaveTheme[name] then
 			SaveTheme[name] = {}
@@ -313,7 +312,7 @@ do
 
 	local IconList = nil
 	pcall(function()
-		IconList = loadstring(game:HttpGet('https://raw.githubusercontent.com/DuxiiT/Core/refs/heads/main/Roblox/Sources/Icons.lua'))()
+		IconList = loadstring(game:HttpGet('https://raw.githubusercontent.com/statatenew-art/MakaraHub/main/Icons.lua'))()
 	end)
 
 	local IconAliases = {
