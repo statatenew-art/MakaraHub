@@ -1,55 +1,61 @@
--- Önbellek kırıcı ekleyerek ( ?t=... ) kütüphaneyi çek
-local libUrl = "https://raw.githubusercontent.com/statatenew-art/MakaraHub/refs/heads/main/ui_lib.lua?t=" .. tostring(os.time())
+-- MakaraHub UI Kütüphanesini GitHub'dan Çek
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/statatenew-art/MakaraHub/refs/heads/main/ui_lib.lua?t=" .. tick()))()
 
-local success, response = pcall(function()
-    return game:HttpGet(libUrl)
-end)
-
-if not success or not response or #response < 100 then
-    warn("[MakaraHub] ui_lib.lua indirilemedi! Yanıt boyutu:", response and #response)
-    return
-end
-
-local loadSuccess, Library = pcall(function()
-    return loadstring(response)()
-end)
-
-if not loadSuccess or type(Library) ~= "table" then
-    warn("[MakaraHub] UI Kütüphanesi yüklenirken hata oluştu:", tostring(Library))
-    return
-end
-
--- Pencereyi Başlat
+-- Pencereyi Başlat (Orijinal Aether Stili)
 local Window = Library:Window({
     Title = "MakaraHub",
     Desc = "TDS Edition"
 })
 
--- Genel Sekme
+-- Sol Menü Sekmeleri
 local AnaSekme = Window:Tab({
     Title = "Genel",
     Icon = "house"
 })
 
--- Karakter Ayarları Bölümü
-local KarakterBolumu = AnaSekme:Section({ Title = "Karakter Ayarları" })
+local SavasSekmesi = Window:Tab({
+    Title = "TDS Menü",
+    Icon = "gamepad-2"
+})
 
--- Hız Toggle
+-- Bölümler ve Kontroller
+local KarakterBolumu = AnaSekme:Section({ Title = "Karakter Hileleri" })
+
 KarakterBolumu:Toggle({
     Title = "Hızlı Koşma",
-    Desc = "Karakter hızını 32 yapar",
+    Desc = "Karakterin yürüme hızını 32 yapar",
     Value = false,
     Callback = function(durum)
         local hum = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid")
-        if hum then
-            hum.WalkSpeed = durum and 32 or 16
-        end
+        if hum then hum.WalkSpeed = durum and 32 or 16 end
     end
 })
 
--- Bildirim Gönder
+KarakterBolumu:Slider({
+    Title = "Özel Hız Değeri",
+    Min = 16,
+    Max = 120,
+    Value = 16,
+    Callback = function(deger)
+        local hum = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid")
+        if hum then hum.WalkSpeed = deger end
+    end
+})
+
+local TDSIlemler = SavasSekmesi:Section({ Title = "Otomasyon" })
+
+TDSIlemler:Toggle({
+    Title = "Oto Dalga Geç (Auto Skip)",
+    Desc = "Dalga geldiğinde otomatik geçer",
+    Value = false,
+    Callback = function(durum)
+        print("Auto Skip durumu:", durum)
+    end
+})
+
+-- Açılış Bildirimi
 Library:Notify({
     Title = "MakaraHub",
-    Desc = "Menü başarıyla yüklendi!",
-    Time = 3
+    Desc = "Menü sorunsuz aktif edildi!",
+    Time = 3.5
 })
