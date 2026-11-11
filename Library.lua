@@ -1,57 +1,29 @@
--- MakaraHub Bağımsız TDS Çekirdeği (New Play Button & Matchmaking)
+-- MakaraHub Çekirdek Kütüphanesi (v2.0 - Network & Override Entegreli)
 local TDS = {}
 TDS.PlacedTowers = {}
-TDS.TargetMap = ""
-TDS.CurrentMode = "Easy"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TeleportService = game:GetService("TeleportService")
 local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
-local LOBBY_PLACE_ID = 3260590327
-local isLobby = (game.PlaceId == LOBBY_PLACE_ID)
-
 local RemoteFunction = ReplicatedStorage:WaitForChild("RemoteFunction", 15)
 local RemoteEvent = ReplicatedStorage:WaitForChild("RemoteEvent", 15)
+local Network = ReplicatedStorage:FindFirstChild("Network")
 
----------------------------------------------------------
--- 1. YENİ "PLAY" BUTONU İLE ANINDA MAÇ BAŞLATMA
----------------------------------------------------------
-local function fastPlayMatch(targetMap, targetMode)
-    print("[MakaraHub] Play menüsü üzerinden maç başlatılıyor: " .. tostring(targetMap))
+-- Haritaların Zorluk Eşleştirmesi
+local MapDifficulties = {
+    ["Gilded Path"] = "Easy",
+    ["Grass Isle"] = "Easy",
+    ["Crystal Cave"] = "Intermediate",
+    ["Crossroads"] = "Molten",
+    ["Abandoned City"] = "Fallen"
+}
 
-    -- 1. Yöntem: Yeni Play butonu Matchmaking remote çağrıları
-    pcall(function()
-        RemoteFunction:InvokeServer("Matchmaking", "Create", {
-            ["Map"] = targetMap,
-            ["Difficulty"] = targetMode or "Easy"
-        })
-    end)
-    
-    pcall(function()
-        RemoteFunction:InvokeServer("Matchmaking", "StartMatch")
-    end)
-
-    -- 2. Yöntem: Standart Hızlı Oyun / Solo Asansör Remote'u
-    pcall(function()
-        RemoteFunction:InvokeServer("Elevators", "JoinCustom", {
-            ["Map"] = targetMap,
-            ["Difficulty"] = targetMode or "Easy",
-            ["Solo"] = true
-        })
-    end)
-
-    -- Maça ışınlanana kadar alt satırlara (kule dizilimine) geçilmesini engelle
-    while isLobby do
-        task.wait(0.5)
-    end
+local function isInGame()
+    return Workspace:FindFirstChild("Towers") ~= nil or Workspace:FindFirstChild("Troops") ~= nil
 end
 
----------------------------------------------------------
--- 2. DALGA VE OYUN VERİSİ TAKİPÇİSİ
----------------------------------------------------------
 local function getCurrentWave()
     local stateReplicators = ReplicatedStorage:FindFirstChild("StateReplicators")
     if stateReplicators then
@@ -68,21 +40,56 @@ local function getCurrentWave()
     return 0
 end
 
-function TDS:WaitForWave(targetWave)
-    if isLobby then return end
-    while getCurrentWave() < targetWave do
-        task.wait(0.5)
-    end
-end
+function TDS:GameInfo(mapName, customDifficulty)
+    local difficulty = customDifficulty or MapDifficulties[mapName] or "Easy"
+    print(string.format("[MakaraHub] Başlatılıyor -> Harita: %s | Zorluk: %s", tostring(mapName), difficulty))
 
----------------------------------------------------------
--- 3. MAKRO KOMUTLARI
----------------------------------------------------------
-function TDS:GameInfo(mapName, modifiers)
-    TDS.TargetMap = mapName
-    if isLobby then
-        fastPlayMatch(mapName, TDS.CurrentMode)
+    -- 1. Lobideysek: Doğrudan Eşleşmeye Gir
+    if not isInGame() then
+        task.spawn(function()
+            pcall(function()
+                if Network and Network:FindFirstChild("Elevators") then
+                    Network.Elevators["RF:Leave"]:InvokeServer()
+                end
+            end)
+            task.wait(0.3)
+            pcall(function()
+                RemoteFunction:InvokeServer("Multiplayer", "single_create", {
+                    ["Difficulty"] = difficulty,
+                    ["Mode"] = "Survival",
+                    ["Count"] = 1
+                })
+            end)
+        end)
     end
+
+    -- 2. Adadaysak: Haritayı Override Et ve Ready Ver
+    task.spawn(function()
+        for i = 1, 30 do
+            if isInGame() then break end
+
+            local success = pcall(function()
+                RemoteFunction:InvokeServer("LobbyVoting", "Override", mapName)
+            end)
+
+            if success then
+                print("[MakaraHub] Harita Override Yapıldı: " .. tostring(mapName))
+                task.wait(0.4)
+                pcall(function()
+                    RemoteEvent:FireServer("LobbyVoting", "Ready")
+                end)
+                break
+            end
+            task.wait(1)
+        end
+    end)
+
+    -- 3. Oyun Haritasının Açılmasını Bekle
+    print("[MakaraHub] Oyun haritasına geçiş bekleniyor...")
+    while not isInGame() do
+        task.wait(1)
+    end
+    print("[MakaraHub] Harita yüklendi! Kule adımlarına geçiliyor.")
 end
 
 function TDS:Loadout(...)
@@ -94,8 +101,7 @@ function TDS:Loadout(...)
 end
 
 function TDS:Mode(modeName, code)
-    TDS.CurrentMode = modeName
-    if not isLobby then
+    if isInGame() then
         pcall(function()
             RemoteFunction:InvokeServer("Difficulty", "Vote", modeName)
         end)
@@ -104,26 +110,26 @@ function TDS:Mode(modeName, code)
 end
 
 function TDS:Ready()
-    if isLobby then return end
+    if not isInGame() then return end
     pcall(function()
         RemoteFunction:InvokeServer("Team", "Ready")
     end)
     task.wait(0.5)
 end
 
-function TDS:VoteSkip(startWave, endWave)
-    if isLobby then return end
-    pcall(function()
-        RemoteFunction:InvokeServer("Voting", "Skip")
-    end)
-    task.wait(0.3)
+function TDS:WaitForWave(targetWave)
+    while getCurrentWave() < targetWave do
+        task.wait(0.5)
+    end
 end
 
 function TDS:Place(towerName, x, y, z, stack)
-    if isLobby then return end
+    while not isInGame() do
+        task.wait(1)
+    end
+
     local pos = Vector3.new(x, y, z)
     local rot = CFrame.Angles(0, 0, 0)
-
     local placedInstance = nil
     local retries = 0
 
@@ -161,7 +167,7 @@ function TDS:Place(towerName, x, y, z, stack)
 end
 
 function TDS:Upgrade(index, path)
-    if isLobby then return end
+    if not isInGame() then return end
     path = path or 1
     local tower = TDS.PlacedTowers[index]
     if tower then
@@ -176,7 +182,7 @@ function TDS:Upgrade(index, path)
 end
 
 function TDS:Sell(index)
-    if isLobby then return end
+    if not isInGame() then return end
     local tower = TDS.PlacedTowers[index]
     if tower then
         pcall(function()
