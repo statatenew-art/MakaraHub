@@ -21,5 +21,5 @@ task.wait(1) -- Arayüzün tam oturması için kısa bir bekleme
 local PlaceId = game.PlaceId
 if PlaceId == 3260590327 or PlaceId == 5591597781 then
     print("[MakaraHub] TDS algılandı, Gatlify/Auto-Farm modülü enjekte ediliyor...")
-    loadstring(game:HttpGet(WorkerURL .. "TDS.lua"))()
+    loadstring(game:HttpGet(WorkerURL .. "Modules/TDS.lua"))()
 end
