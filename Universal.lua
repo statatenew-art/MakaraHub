@@ -823,7 +823,7 @@ do
 
 	local IconList = nil
 	pcall(function()
-		IconList = loadstring(game:HttpGet('https://raw.githubusercontent.com/statatenew-art/MakaraHub/refs/heads/main/Icons.lua'))()
+		https://raw.githubusercontent.com/DuxiiT/Aether/refs/heads/main/Icons.lua
 	end)
 
 	local IconAliases = {
